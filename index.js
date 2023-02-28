@@ -50,13 +50,6 @@ class Song {
 	}
 }
 
-const scales = {
-	major: [0, 2, 4, 5, 7, 9, 11, 12],
-	minor: [0, 2, 3, 5, 7, 8, 10, 12],
-	whole: [0, 2, 4, 6, 8, 10, 12],
-	penta: [0, 2, 4, 7, 9, 12],
-};
-
 const input = document.getElementById("input");
 const console = document.getElementById("console");
 console.clear = () => console.value = "";
@@ -66,7 +59,7 @@ let song;
 const parse = () => {
 	console.clear();
 
-	const parseNumber = string =>
+	const parseDigit = string =>
 		string === '0'? 0:
 		string === '1'? 1:
 		string === '2'? 2:
@@ -105,7 +98,7 @@ const parse = () => {
 			}
 			else if (a === ' ' || a === '\n' || a === '\r') {}
 			else if (a === '_') stack.push(Song.rest());
-			else if (parseNumber(a) !== null) stack.push(Song.note(parseNumber(a)));
+			else if (parseDigit(a) !== null) stack.push(Song.note(parseDigit(a)));
 			else {
 				context.i++;
 				     if (a === '(') stack.push(...parse(context, ')'));
@@ -113,14 +106,14 @@ const parse = () => {
 				else if (a === '{') stack.push(Song.parallel(...parse(context, '}')));
 				else if (a === "=") context.vars[parseName(context)] = stack.pop();
 				else {
-					const b = parseNumber(context.text[context.i]);
+					const b = parseDigit(context.text[context.i]);
 					if (b === null) console.error(`invalid parameter ${context.text[context.i]}`);
 					else if (a === "<") stack.push(stack.pop().length(1 / b));
 					else if (a === ">") stack.push(stack.pop().length(b));
 					else if (a === "^") stack.push(stack.pop().volume(b));
 					else if (a === "v") stack.push(stack.pop().volume(1 / b));
-					else if (a === "+") stack.push(stack.pop().pitch(b * 12));
-					else if (a === "-") stack.push(stack.pop().pitch(b * -12));
+					else if (a === "+") stack.push(stack.pop().pitch(b));
+					else if (a === "-") stack.push(stack.pop().pitch(-b));
 					else console.error(`unknown command ${a}`);
 				}
 			}
@@ -130,7 +123,7 @@ const parse = () => {
 	}
 
 	let stack = parse({text: input.value, i: 0, vars: {}}, "");
-	if (stack.length > 1) console.error("stack too large", stack);
+	if (stack.length > 1) console.error("stack too large");
 	song = stack.length? stack.pop(): Song.rest();
 };
 
