@@ -86,22 +86,39 @@ const parse = () => {
 		string === 'T'? 12:
 		null;
 
-	function parse(o, target) {
+	const parseName = context => {
+		let name = context.text[context.i];
+		for (; context.i < context.text.length; context.i++) {
+			const c = context.text[context.i + 1];
+			if (" \n\r_(){}[]$=<>^v+-".includes(c)) break;
+			name += c;
+		}
+		return name;
+	};
+
+	function parse(context, target) {
 		let stack = [];
-		for (; o.i < input.value.length; o.i++) {
-			const a = input.value[o.i];
+		for (; context.i < context.text.length; context.i++) {
+			const a = context.text[context.i];
 			if (a === target) return stack;
+			else if (a === '$') {
+				context.i++;
+				const name = parseName(context);
+				if (context.vars.hasOwnProperty(name)) stack.push(context.vars[name]);
+				else console.error(`unknown variable ${name}`);
+			}
 			else if (a === ' ' || a === '\n' || a === '\r') {}
 			else if (a === '_') stack.push(Song.rest());
 			else if (parseNumber(a) !== null) stack.push(Song.note(parseNumber(a)));
 			else {
-				o.i++;
-				     if (a === '(') stack.push(...parse(o, ')'));
-				else if (a === '[') stack.push(Song.series(...parse(o, ']')));
-				else if (a === '{') stack.push(Song.parallel(...parse(o, '}')));
+				context.i++;
+				     if (a === '(') stack.push(...parse(context, ')'));
+				else if (a === '[') stack.push(Song.series(...parse(context, ']')));
+				else if (a === '{') stack.push(Song.parallel(...parse(context, '}')));
+				else if (a === "=") context.vars[parseName(context)] = stack.pop();
 				else {
-					const b = parseNumber(input.value[o.i]);
-					if (b === null) console.error(`invalid parameter ${input.value[o.i]}`);
+					const b = parseNumber(context.text[context.i]);
+					if (b === null) console.error(`invalid parameter ${context.text[context.i]}`);
 					else if (a === "<") stack.push(stack.pop().length(1 / b));
 					else if (a === ">") stack.push(stack.pop().length(b));
 					else if (a === "^") stack.push(stack.pop().volume(b));
@@ -114,10 +131,9 @@ const parse = () => {
 		return stack;
 	}
 
-	let stack = parse({i: 0}, "");
-	song = stack.length === 1? stack[0]:
-	       stack.length === 0? Song.rest():
-	       console.error("stack too large", stack);
+	let stack = parse({text: input.value, i: 0, vars: {}}, "");
+	if (stack.length > 1) console.error("stack too large", stack);
+	song = stack.length? stack.pop(): Song.rest();
 };
 
 const canvas = document.getElementById("canvas");
