@@ -23,9 +23,9 @@ class Song {
 		);
 	}
 
-	static sequence(...songs) {
+	static series(...songs) {
 		const ds = songs.map(song => song.duration);
-		const sums = [...Array(ds.length)].map((_, i) => ds.slice(0, i).sum());
+		const sums = ds.map((_, i) => ds.slice(0, i).sum());
 		return new Song(ds.sum(), t => songs.flatMap((song, i) => song.notes(t - sums[i])));
 	}
 
@@ -50,7 +50,7 @@ class Song {
 	sample(time) {
 		let amps = this.notes(time).map(({note, volume}) => 
 			volume * Math.cos(2 * Math.PI * time * 440 * Math.pow(2, note / 12)));
-		return (amps.sum() / amps.length) || 0;
+		return amps.sum() || 0;
 	}
 }
 
@@ -61,12 +61,56 @@ const scales = {
 	penta: [0, 2, 4, 7, 9, 12],
 };
 
-const song = Song.sequence(
-	Song.note(7), Song.note(4), Song.note(0), Song.note(4),
-	Song.note(5).length(2), Song.note(2).length(2),
-	Song.note(7), Song.note(4), Song.note(0), Song.note(4),
-	Song.note(2).length(2), Song.rest().length(2),
-).length(0.25).volume(0.5);
+const input = document.getElementById("input");
+let song;
+const parse = () => {
+	const parseNumber = string =>
+		string === '0'? 0:
+		string === '1'? 1:
+		string === '2'? 2:
+		string === '3'? 3:
+		string === '4'? 4:
+		string === '5'? 5:
+		string === '6'? 6:
+		string === '7'? 7:
+		string === '8'? 8:
+		string === '9'? 9:
+		string === 'X'? 10:
+		string === 'E'? 11:
+		string === 'T'? 12:
+		null;
+
+	function parse(o, target) {
+		let stack = [];
+		for (; o.i < input.value.length; o.i++) {
+			const a = input.value[o.i];
+			if (a === target) return stack;
+			else if (a === ' ' || a === '\n' || a === '\r') {}
+			else if (a === '_') stack.push(Song.rest());
+			else if (parseNumber(a) !== null) stack.push(Song.note(parseNumber(a)));
+			else {
+				o.i++;
+				     if (a === '(') stack.push(...parse(o, ')'));
+				else if (a === '[') stack.push(Song.series(...parse(o, ']')));
+				else if (a === '{') stack.push(Song.parallel(...parse(o, '}')));
+				else {
+					const b = parseNumber(input.value[o.i]);
+					     if (a === "<") stack.push(stack.pop().length(1 / b));
+					else if (a === ">") stack.push(stack.pop().length(b));
+					else if (a === "^") stack.push(stack.pop().volume(b));
+					else if (a === "v") stack.push(stack.pop().volume(1 / b));
+					else console.error(`unknown command ${a}`);
+				}
+			}
+		}
+		return stack;
+	}
+
+	let stack = parse({i: 0}, "");
+	song = stack.length === 1? stack[0]:
+	       stack.length === 0? Song.rest():
+	       console.error("stack too large", stack);
+};
 
 const canvas = document.getElementById("canvas");
 
@@ -100,7 +144,7 @@ canvas.addEventListener("click", async () => {
 	setTimeout(update(1), 750);
 });
 
-{
+const render = () => {
 	const context = canvas.getContext("2d");
 	const {width: w, height: h} = canvas.getBoundingClientRect();
 	canvas.width = w;
@@ -110,9 +154,13 @@ canvas.addEventListener("click", async () => {
 	for (let x = 0; x < w; x++) for (const {note, volume} of song.notes(x / w * song.duration)) {
 		const intensity = (0xEE - 0x11) * volume + 0x11;
 		context.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`;
-		context.fillRect(x, h / 2 - note / 48 * h - h / 48, 1, h / 48);
+		context.fillRect(x, h / 2 - note / 24 * h - h / 24, 1, h / 24);
 	}
 	context.fillStyle = "#EEE";
 	for (let x = 0; x <= w; x += w / song.duration) context.fillRect(x, 0, 1, h);
-	for (let y = 0; y <= h; y += h / 48) context.fillRect(0, y, w, 1);
-}
+	for (let y = 0; y <= h; y += h / 24) context.fillRect(0, y, w, 1);
+};
+
+const update = () => { parse(); render(); };
+update();
+input.addEventListener("input", update);
