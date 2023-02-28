@@ -43,10 +43,6 @@ class Song {
 			this.notes(t).map(({note, volume}) => ({note, volume: volume * v})));
 	}
 
-	reverse() {
-		return new Song(this.duration, t => this.notes(this.duration - t));
-	}
-
 	sample(time) {
 		let amps = this.notes(time).map(({note, volume}) => 
 			volume * Math.cos(2 * Math.PI * time * 440 * Math.pow(2, note / 12)));
@@ -123,6 +119,8 @@ const parse = () => {
 					else if (a === ">") stack.push(stack.pop().length(b));
 					else if (a === "^") stack.push(stack.pop().volume(b));
 					else if (a === "v") stack.push(stack.pop().volume(1 / b));
+					else if (a === "+") stack.push(stack.pop().pitch(b * 12));
+					else if (a === "-") stack.push(stack.pop().pitch(b * -12));
 					else console.error(`unknown command ${a}`);
 				}
 			}
