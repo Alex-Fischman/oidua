@@ -68,7 +68,9 @@ const song = Song.sequence(
 	Song.note(2).length(2), Song.rest().length(2),
 ).length(0.25).volume(0.5);
 
-window.addEventListener("keypress", async () => {
+const canvas = document.getElementById("canvas");
+
+canvas.addEventListener("click", async () => {
 	const context = new AudioContext();
 	
 	const S = context.sampleRate;
@@ -99,7 +101,6 @@ window.addEventListener("keypress", async () => {
 });
 
 {
-	const canvas = document.getElementById("canvas");
 	const context = canvas.getContext("2d");
 	const {width: w, height: h} = canvas.getBoundingClientRect();
 	canvas.width = w;

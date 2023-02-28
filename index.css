@@ -1,10 +1,19 @@
-html, body, canvas {
+html, body, textarea, canvas {
 	width: 100%;
 	height: 100%;
 	margin: 0;
-	border: 0;
-	padding: 0;
 	display: block;
+	box-sizing: border-box;
 	touch-action: none;
 	background-color: #111;
+	color: #EEE;
+}
+
+#input, #canvas {
+	height: 50%;
+}
+
+#input {
+	resize: none;
+	padding: 10px;
 }
