@@ -62,8 +62,14 @@ const scales = {
 };
 
 const input = document.getElementById("input");
+const console = document.getElementById("console");
+console.clear = () => console.value = "";
+console.error = text => console.value += `${text}\n`;
+
 let song;
 const parse = () => {
+	console.clear();
+
 	const parseNumber = string =>
 		string === '0'? 0:
 		string === '1'? 1:
@@ -95,7 +101,8 @@ const parse = () => {
 				else if (a === '{') stack.push(Song.parallel(...parse(o, '}')));
 				else {
 					const b = parseNumber(input.value[o.i]);
-					     if (a === "<") stack.push(stack.pop().length(1 / b));
+					if (b === null) console.error(`invalid parameter ${input.value[o.i]}`);
+					else if (a === "<") stack.push(stack.pop().length(1 / b));
 					else if (a === ">") stack.push(stack.pop().length(b));
 					else if (a === "^") stack.push(stack.pop().volume(b));
 					else if (a === "v") stack.push(stack.pop().volume(1 / b));
@@ -103,6 +110,7 @@ const parse = () => {
 				}
 			}
 		}
+		if (target) console.error(`missing ${target}`);
 		return stack;
 	}
 

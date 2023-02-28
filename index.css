@@ -9,11 +9,13 @@ html, body, textarea, canvas {
 	color: #EEE;
 }
 
-#input, #canvas {
+textarea, #canvas {
 	height: 50%;
 }
 
-#input {
+textarea {
+	width: 50%;
 	resize: none;
 	padding: 10px;
+	float: left;
 }
