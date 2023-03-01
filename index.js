@@ -2,58 +2,53 @@ Array.prototype.sum = function() {
 	return this.reduce((a, b) => a + b, 0);
 }
 
-class Song {
-	constructor(duration, notes) {
-		this.duration = duration;
-		this.notes = notes;
-	}
-
-	static note(note) {
-		return new Song(1, t => (t < 0 || t > 1)? []: [{note, volume: Math.sin(Math.PI * t)}]);
-	}
-
-	static rest() {
-		return new Song(1, t => []);
-	}
-
-	static parallel(...songs) {
-		return new Song(
-			Math.max(...songs.map(song => song.duration)),
-			t => songs.flatMap(song => song.notes(t))
-		);
-	}
-
-	static series(...songs) {
-		const ds = songs.map(song => song.duration);
-		const sums = ds.map((_, i) => ds.slice(0, i).sum());
-		return new Song(ds.sum(), t => songs.flatMap((song, i) => song.notes(t - sums[i])));
-	}
-
-	pitch(p) {
-		return new Song(this.duration, t => 
-			this.notes(t).map(({note, volume}) => ({note: note + p, volume})));
-	}
-
-	length(l) {
-		return new Song(this.duration * l, t => this.notes(t / l));
-	}
-
-	volume(v) {
-		return new Song(this.duration, t => 
-			this.notes(t).map(({note, volume}) => ({note, volume: volume * v})));
-	}
-
-	sample(time) {
-		let amps = this.notes(time).map(({note, volume}) => 
-			volume * Math.cos(2 * Math.PI * time * 440 * Math.pow(2, note / 12)));
-		return amps.sum() || 0;
-	}
-}
-
 const input = document.getElementById("input");
 const console = document.getElementById("console");
 console.clear = () => console.value = "";
 console.error = text => console.value += `${text}\n`;
+
+const note = note => ({
+	duration: 1,
+	notes: t => (t < 0 || t > 1)? []: [{note, volume: Math.sin(Math.PI * t)}],
+});
+
+const rest = () => ({
+	duration: 1,
+	notes: t => [],
+});
+
+const parallel = (...songs) => ({
+	duration: Math.max(...songs.map(song => song.duration)),
+	notes: t => songs.flatMap(song => song.notes(t)),
+});
+
+const series = (...songs) => {
+	const ds = songs.map(song => song.duration);
+	const sums = ds.map((_, i) => ds.slice(0, i).sum());
+	return {
+		duration: ds.sum(),
+		notes: t => songs.flatMap((song, i) => song.notes(t - sums[i])),
+	};
+};
+
+const pitch = (p, song) => ({
+	duration: song.duration,
+	notes: t => song.notes(t).map(({note, volume}) => ({note: note + p, volume})),
+});
+
+const length = (l, song) => ({
+	duration: song.duration * l,
+	notes: t => song.notes(t / l),
+});
+
+const volume = (v, song) => ({
+	duration: song.duration,
+	notes: t => song.notes(t).map(({note, volume}) => ({note, volume: volume * v})),
+});
+
+const sample = (song, time) => song.notes(time)
+	.map(({note, volume}) => volume * Math.cos(2 * Math.PI * time * 440 * Math.pow(2, note / 12)))
+	.sum() || 0;
 
 let song;
 const parse = () => {
@@ -97,23 +92,23 @@ const parse = () => {
 				else console.error(`unknown variable ${name}`);
 			}
 			else if (a === ' ' || a === '\n' || a === '\r') {}
-			else if (a === '_') stack.push(Song.rest());
-			else if (parseDigit(a) !== null) stack.push(Song.note(parseDigit(a)));
+			else if (a === '_') stack.push(rest());
+			else if (parseDigit(a) !== null) stack.push(note(parseDigit(a)));
 			else {
 				context.i++;
 				     if (a === '(') stack.push(...parse(context, ')'));
-				else if (a === '[') stack.push(Song.series(...parse(context, ']')));
-				else if (a === '{') stack.push(Song.parallel(...parse(context, '}')));
+				else if (a === '[') stack.push(series(...parse(context, ']')));
+				else if (a === '{') stack.push(parallel(...parse(context, '}')));
 				else if (a === "=") context.vars[parseName(context)] = stack.pop();
 				else {
 					const b = parseDigit(context.text[context.i]);
 					if (b === null) console.error(`invalid parameter ${context.text[context.i]}`);
-					else if (a === "<") stack.push(stack.pop().length(1 / b));
-					else if (a === ">") stack.push(stack.pop().length(b));
-					else if (a === "^") stack.push(stack.pop().volume(b));
-					else if (a === "v") stack.push(stack.pop().volume(1 / b));
-					else if (a === "+") stack.push(stack.pop().pitch(b));
-					else if (a === "-") stack.push(stack.pop().pitch(-b));
+					else if (a === "<") stack.push(length(1 / b, stack.pop()));
+					else if (a === ">") stack.push(length(b, stack.pop()));
+					else if (a === "^") stack.push(volume(b, stack.pop()));
+					else if (a === "v") stack.push(volume(1 / b, stack.pop()));
+					else if (a === "+") stack.push(pitch(b, stack.pop()));
+					else if (a === "-") stack.push(pitch(-b, stack.pop()));
 					else console.error(`unknown command ${a}`);
 				}
 			}
@@ -124,7 +119,7 @@ const parse = () => {
 
 	let stack = parse({text: input.value, i: 0, vars: {}}, "");
 	if (stack.length > 1) console.error("stack too large");
-	song = stack.length? stack.pop(): Song.rest();
+	song = stack.length? stack.pop(): rest();
 };
 
 const canvas = document.getElementById("canvas");
@@ -136,7 +131,7 @@ canvas.addEventListener("click", async () => {
 	const buffer = context.createBuffer(1, S, S);
 	const channel = buffer.getChannelData(0);
 	const fillBuffer = (start, end) => {
-		for (let i = start * S; i < end * S; i++) channel[i % S] = song.sample(i / S);
+		for (let i = start * S; i < end * S; i++) channel[i % S] = sample(song, i / S);
 	};
 	fillBuffer(0, 1, 0);
 
