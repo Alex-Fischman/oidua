@@ -54,62 +54,55 @@ let song;
 const parse = () => {
 	console.clear();
 
-	const parseDigit = string =>
-		string === '0'? 0:
-		string === '1'? 1:
-		string === '2'? 2:
-		string === '3'? 3:
-		string === '4'? 4:
-		string === '5'? 5:
-		string === '6'? 6:
-		string === '7'? 7:
-		string === '8'? 8:
-		string === '9'? 9:
-		string === 'X'? 10:
-		string === 'E'? 11:
-		string === 'T'? 12:
-		null;
+	const text = input.value;
+	
+	const isBracket = c => "(){}[]".includes(c);
+	const isWhitespace = c => " \t\n\r".includes(c);
+	const isLetter = c => /[_a-zA-Z]/.test(c);
+	const isNumber = c => /[0-9]/.test(c);
+	const isOperator = c => !isBracket(c) && !isWhitespace(c) && !isLetter(c) && !isNumber(c);
 
-	const parseName = context => {
-		let name = context.text[context.i];
-		for (; context.i < context.text.length; context.i++) {
-			const c = context.text[context.i + 1];
-			if (" \n\r_(){}[]$=<>^v+-".includes(c)) break;
-			name += c;
+	let lexed = [text[0]];
+	for (let i = 1; i < text.length; i++) {
+		const c = text[i];
+		const d = lexed[lexed.length - 1];
+		if ((isLetter(c) && isLetter(d)) || 
+		    (isNumber(c) && isNumber(d)) || 
+		    (isOperator(c) && isOperator(d))) {
+			lexed[lexed.length - 1] += c;
+		} else {
+			lexed.push(c);
 		}
-		return name;
-	};
+	}
+	lexed = lexed.filter(s => !" \t\n\r".includes(s));
 
 	function parse(context, target) {
 		let stack = [];
-		for (; context.i < context.text.length; context.i++) {
-			const a = context.text[context.i];
+		for (; context.i < lexed.length; context.i++) {
+			const a = lexed[context.i];
 			if (a === target) return stack;
-			else if (a === '$') {
-				context.i++;
-				const name = parseName(context);
-				if (context.vars.hasOwnProperty(name)) stack.push(context.vars[name]);
-				else console.error(`unknown variable ${name}`);
-			}
-			else if (a === ' ' || a === '\n' || a === '\r') {}
+			else if (isWhitespace(a)) {}
 			else if (a === '_') stack.push(rest());
-			else if (parseDigit(a) !== null) stack.push(note(parseDigit(a)));
+			else if (!Number.isNaN(parseFloat(a))) stack.push(note(parseFloat(a)));
+			else if (context.vars.hasOwnProperty(a)) stack.push(context.vars[a]);
 			else {
 				context.i++;
-				     if (a === '(') stack.push(...parse(context, ')'));
-				else if (a === '[') stack.push(series(...parse(context, ']')));
-				else if (a === '{') stack.push(parallel(...parse(context, '}')));
-				else if (a === "=") context.vars[parseName(context)] = stack.pop();
+				const b = lexed[context.i];
+				if (a === "=") context.vars[b] = stack.pop();
+				else if (a === "(") stack.push(...parse(context, ")"));
+				else if (a === "[") stack.push(series(...parse(context, "]")));
+				else if (a === "{") stack.push(parallel(...parse(context, "}")));
 				else {
-					const b = parseDigit(context.text[context.i]);
-					if (b === null) console.error(`invalid parameter ${context.text[context.i]}`);
-					else if (a === "<") stack.push(length(1 / b, stack.pop()));
-					else if (a === ">") stack.push(length(b, stack.pop()));
-					else if (a === "^") stack.push(volume(b, stack.pop()));
-					else if (a === "v") stack.push(volume(1 / b, stack.pop()));
-					else if (a === "+") stack.push(pitch(b, stack.pop()));
-					else if (a === "-") stack.push(pitch(-b, stack.pop()));
+					const p = parseFloat(b);
+					if (a === "<") stack.push(length(1 / p, stack.pop()));
+					else if (a === ">") stack.push(length(p, stack.pop()));
+					else if (a === "^") stack.push(volume(p, stack.pop()));
+					else if (a === "v") stack.push(volume(1 / p, stack.pop()));
+					else if (a === "+") stack.push(pitch(p, stack.pop()));
+					else if (a === "-") stack.push(pitch(-p, stack.pop()));
 					else console.error(`unknown command ${a}`);
+
+					if (Number.isNaN(p)) console.error(`invalid parameter ${b}`);
 				}
 			}
 		}
@@ -117,7 +110,7 @@ const parse = () => {
 		return stack;
 	}
 
-	let stack = parse({text: input.value, i: 0, vars: {}}, "");
+	let stack = parse({i: 0, vars: {}}, "");
 	if (stack.length > 1) console.error("stack too large");
 	song = stack.length? stack.pop(): rest();
 };
@@ -155,16 +148,18 @@ canvas.addEventListener("click", async () => {
 });
 
 const render = () => {
-	const context = canvas.getContext("2d");
+	const context = canvas.getContext("2d", { willReadFrequently: true });
 	const {width: w, height: h} = canvas.getBoundingClientRect();
 	canvas.width = w;
 	canvas.height = h;
 	context.fillStyle = "#111";
 	context.fillRect(0, 0, w, h);
 	for (let x = 0; x < w; x++) for (const {note, volume} of song.notes(x / w * song.duration)) {
-		const intensity = (0xEE - 0x11) * volume + 0x11;
+		const y = h / 2 - note / 24 * h - h / 24;
+		const old = (context.getImageData(x, y, 1, 1).data[0] - 0x11) / (0xEE - 0x11);
+		const intensity = (0xEE - 0x11) * (volume + old) + 0x11;
 		context.fillStyle = `rgb(${intensity}, ${intensity}, ${intensity})`;
-		context.fillRect(x, h / 2 - note / 24 * h - h / 24, 1, h / 24);
+		context.fillRect(x, y, 1, h / 24);
 	}
 	context.fillStyle = "#EEE";
 	for (let x = 0; x <= w; x += w / song.duration) context.fillRect(x, 0, 1, h);
