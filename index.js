@@ -18,7 +18,7 @@ const rest = () => ({
 });
 
 const parallel = (...songs) => ({
-	duration: Math.max(...songs.map(song => song.duration)),
+	duration: Math.max(...songs.map(song => song.duration), 0),
 	notes: t => songs.flatMap(song => song.notes(t)),
 });
 
