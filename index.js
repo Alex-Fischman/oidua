@@ -24,10 +24,10 @@ const parallel = (...songs) => ({
 
 const series = (...songs) => {
 	const ds = songs.map(song => song.duration);
-	const sums = ds.map((_, i) => ds.slice(0, i).sum());
+	const partialSums = ds.map((_, i) => ds.slice(0, i).sum());
 	return {
 		duration: ds.sum(),
-		notes: t => songs.flatMap((song, i) => song.notes(t - sums[i])),
+		notes: t => songs.flatMap((song, i) => song.notes(t - partialSums[i])),
 	};
 };
 
